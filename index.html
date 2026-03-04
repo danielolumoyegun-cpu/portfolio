@@ -619,7 +619,6 @@
         <!-- Premium portrait column -->
         <div class="reveal">
           <div class="heroPortrait" aria-label="Portrait card">
-            <!-- Put profile.jpg in same folder -->
             <img class="heroPortrait__img" src="profile.jpg.jpeg" alt="Daniel Odunayo Olumoyegun portrait">
             <div class="heroPortrait__body">
               <div>
@@ -899,11 +898,11 @@ const build = (idea) => ({
             <a class="chip" href="https://twitter.com/your-username" target="_blank" rel="noreferrer">Twitter</a>
           </div>
 
-          <p class="sub reveal" style="margin-top:1rem;">
-          </p>
+          <p class="sub reveal" style="margin-top:1rem;"></p>
         </div>
 
-        <form class="card form reveal" id="contactForm" novalidate>
+        <!-- ✅ FIXED FORM (was broken in your pasted code) -->
+        <form class="card form reveal" id="contactForm" action="https://formspree.io/f/xgolggan" method="POST" novalidate>
           <div class="field">
             <label for="name">Name</label>
             <input id="name" name="name" type="text" placeholder="Your name" required />
@@ -943,6 +942,7 @@ const build = (idea) => ({
 
   <button class="toTop" id="toTop" aria-label="Back to top">↑</button>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     // Footer year
     document.getElementById("year").textContent = String(new Date().getFullYear());
@@ -1002,9 +1002,14 @@ const build = (idea) => ({
     });
     toTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 
-    // Contact form (demo validation)
+    // Contact form (validation + Supabase + Formspree)
     const form = document.getElementById("contactForm");
     const statusEl = document.getElementById("formStatus");
+
+    // Supabase setup
+    const SUPABASE_URL = "https://xrybawttvelbtzfbubyz.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhyeWJhd3R0dmVsYnR6ZmJ1Ynl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NjEwMjcsImV4cCI6MjA4ODIzNzAyN30.dM3sYg8W2FSzopQaEt25O6Nrg10iKTpovoBjacDzdWI";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     function setError(name, msg){
       const el = document.querySelector('[data-error-for="'+name+'"]');
@@ -1014,7 +1019,7 @@ const build = (idea) => ({
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
     }
 
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       statusEl.textContent = "";
 
@@ -1031,11 +1036,37 @@ const build = (idea) => ({
 
       if (!ok) return;
 
-      statusEl.textContent = "Message ready ✅ (Connect a backend to actually send it.)";
+      // 1) Save to Supabase DB
+      const { error } = await supabaseClient
+        .from("messages")
+        .insert([{ name, email, message }]);
+
+      if (error) {
+        statusEl.textContent = "Could not save message ❌ (check Supabase table/policy)";
+        return;
+      }
+
+      // 2) Send to Formspree email
+      try {
+        const formData = new FormData(form);
+        const res = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: { "Accept": "application/json" }
+        });
+
+        if (!res.ok) {
+          statusEl.textContent = "Saved ✅ but email failed ❌";
+          return;
+        }
+      } catch {
+        statusEl.textContent = "Saved ✅ but email failed ❌";
+        return;
+      }
+
+      statusEl.textContent = "Message sent ✅ and saved ✅";
       form.reset();
     });
   </script>
 </body>
 </html>
-
-
